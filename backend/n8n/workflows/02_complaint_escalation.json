@@ -31,7 +31,7 @@
         "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"workflow_name\": \"Complaint Escalation\",\n  \"status\": \"success\",\n  \"trigger_event\": \"complaint_triaged\",\n  \"payload\": {\n    \"escalation_id\": {{ $json.escalation_id || 'null' }},\n    \"conversation_id\": \"{{ $json.conversation_id }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"category\": \"{{ $json.category }}\"\n  }\n}"
+        "jsonBody": "={{ JSON.stringify({\n  workflow_name: 'Complaint Escalation',\n  status: 'success',\n  trigger_event: 'complaint_triaged',\n  payload: {\n    escalation_id: $('Triage Category & Priority').item.json.escalation_id || null,\n    conversation_id: $('Triage Category & Priority').item.json.conversation_id,\n    priority: $('Triage Category & Priority').item.json.priority,\n    category: $('Triage Category & Priority').item.json.category\n  }\n}) }}"
       },
       "id": "node_sync_backend",
       "name": "Sync Record via Backend",
@@ -45,7 +45,7 @@
         "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"workflow_name\": \"Complaint Escalation Notification\",\n  \"status\": \"success\",\n  \"trigger_event\": \"support_team_notified\",\n  \"payload\": {\n    \"recipient\": \"duty_manager@grandhotelazure.demo\",\n    \"subject\": \"[{{ $('Triage Category & Priority').item.json.priority.toUpperCase() }}] Guest Complaint Alert\",\n    \"guest\": \"{{ $('Triage Category & Priority').item.json.guest_name }}\"\n  }\n}"
+        "jsonBody": "={{ JSON.stringify({\n  workflow_name: 'Complaint Escalation Notification',\n  status: 'success',\n  trigger_event: 'support_team_notified',\n  payload: {\n    recipient: 'duty_manager@grandhotelazure.demo',\n    subject: '[' + $('Triage Category & Priority').item.json.priority.toUpperCase() + '] Guest Complaint Alert',\n    guest: $('Triage Category & Priority').item.json.guest_name\n  }\n}) }}"
       },
       "id": "node_notify_team",
       "name": "Notify Support Duty Team",
@@ -56,7 +56,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"status\": \"escalated\",\n  \"escalation_id\": {{ $('Triage Category & Priority').item.json.escalation_id || 'null' }},\n  \"priority\": \"{{ $('Triage Category & Priority').item.json.priority }}\",\n  \"category\": \"{{ $('Triage Category & Priority').item.json.category }}\",\n  \"notification_dispatched\": true,\n  \"message\": \"Complaint successfully triaged and escalated to Duty Manager.\"\n}",
+        "responseBody": "={{ JSON.stringify({\n  status: 'escalated',\n  escalation_id: $('Triage Category & Priority').item.json.escalation_id || null,\n  priority: $('Triage Category & Priority').item.json.priority,\n  category: $('Triage Category & Priority').item.json.category,\n  notification_dispatched: true,\n  message: 'Complaint successfully triaged and escalated to Duty Manager.'\n}) }}",
         "options": {}
       },
       "id": "node_respond_complaint",

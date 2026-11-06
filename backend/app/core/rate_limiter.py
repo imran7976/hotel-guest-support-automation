@@ -55,3 +55,4 @@ def rate_limit_public_endpoint(request: Request):
             detail="Rate limit exceeded. Maximum 60 requests per minute allowed.",
             headers={"Retry-After": "60"}
         )
+

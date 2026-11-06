@@ -14,8 +14,8 @@
       },
       "id": "node_daily_cron",
       "name": "Daily Midnight Trigger",
-      "type": "n8n-nodes-base.cron",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [180, 240]
     },
     {
@@ -48,7 +48,7 @@
         "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"workflow_name\": \"Daily Support Summary\",\n  \"status\": \"success\",\n  \"trigger_event\": \"daily_audit_completed\",\n  \"payload\": {\n    \"report_date\": \"{{ $json.report_date }}\",\n    \"total\": {{ $json.total_inquiries }},\n    \"ai_resolved\": {{ $json.ai_resolved }},\n    \"escalated\": {{ $json.escalated }},\n    \"unresolved\": {{ $json.unresolved }}\n  }\n}"
+        "jsonBody": "={{ JSON.stringify({\n  workflow_name: 'Daily Support Summary',\n  status: 'success',\n  trigger_event: 'daily_audit_completed',\n  payload: {\n    report_date: $json.report_date,\n    total: $json.total_inquiries,\n    ai_resolved: $json.ai_resolved,\n    escalated: $json.escalated,\n    unresolved: $json.unresolved\n  }\n}) }}"
       },
       "id": "node_store_report",
       "name": "Store Report in MySQL",
@@ -62,7 +62,7 @@
         "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"workflow_name\": \"Admin Daily Digest Notification\",\n  \"status\": \"success\",\n  \"trigger_event\": \"admin_notified\",\n  \"payload\": {\n    \"recipient\": \"admin@grandhotelazure.demo\",\n    \"subject\": \"Daily Hotel Support Digest - {{ $('Format Daily Digest').item.json.report_date }}\",\n    \"digest\": \"{{ $('Format Daily Digest').item.json.formatted_report }}\"\n  }\n}"
+        "jsonBody": "={{ JSON.stringify({\n  workflow_name: 'Admin Daily Digest Notification',\n  status: 'success',\n  trigger_event: 'admin_notified',\n  payload: {\n    recipient: 'admin@grandhotelazure.demo',\n    subject: 'Daily Hotel Support Digest - ' + $('Format Daily Digest').item.json.report_date,\n    digest: $('Format Daily Digest').item.json.formatted_report\n  }\n}) }}"
       },
       "id": "node_notify_admin",
       "name": "Notify Hotel Administrator",

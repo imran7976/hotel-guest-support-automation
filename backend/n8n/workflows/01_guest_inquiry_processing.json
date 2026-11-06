@@ -74,7 +74,7 @@
         "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"workflow_name\": \"Guest Inquiry Processing\",\n  \"status\": \"success\",\n  \"trigger_event\": \"escalation_detected\",\n  \"payload\": {\n    \"conversation_id\": \"{{ $json.conversation_id }}\",\n    \"intent\": \"{{ $json.intent }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"escalation_id\": {{ $json.escalation_id || 'null' }}\n  }\n}"
+        "jsonBody": "={{ JSON.stringify({\n  workflow_name: 'Guest Inquiry Processing',\n  status: 'success',\n  trigger_event: 'escalation_detected',\n  payload: {\n    conversation_id: $('Send Inquiry to FastAPI Backend').item.json.conversation_id,\n    intent: $('Send Inquiry to FastAPI Backend').item.json.intent,\n    priority: $('Send Inquiry to FastAPI Backend').item.json.priority,\n    escalation_id: $('Send Inquiry to FastAPI Backend').item.json.escalation_id || null\n  }\n}) }}"
       },
       "id": "node_log_escalation",
       "name": "Log Escalation Event",
@@ -85,7 +85,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"conversation_id\": \"{{ $json.conversation_id }}\",\n  \"intent\": \"{{ $json.intent }}\",\n  \"confidence\": {{ $json.confidence }},\n  \"priority\": \"{{ $json.priority }}\",\n  \"requires_human\": {{ $json.requires_human }},\n  \"response\": {{ JSON.stringify($json.response) }},\n  \"escalation_id\": {{ $json.escalation_id || 'null' }},\n  \"timestamp\": \"{{ $json.timestamp }}\"\n}",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  conversation_id: $('Send Inquiry to FastAPI Backend').item.json.conversation_id,\n  intent: $('Send Inquiry to FastAPI Backend').item.json.intent,\n  confidence: $('Send Inquiry to FastAPI Backend').item.json.confidence,\n  priority: $('Send Inquiry to FastAPI Backend').item.json.priority,\n  requires_human: $('Send Inquiry to FastAPI Backend').item.json.requires_human,\n  response: $('Send Inquiry to FastAPI Backend').item.json.response,\n  escalation_id: $('Send Inquiry to FastAPI Backend').item.json.escalation_id || null,\n  timestamp: $('Send Inquiry to FastAPI Backend').item.json.timestamp\n}) }}",
         "options": {}
       },
       "id": "node_respond_webhook",
