@@ -1,0 +1,99 @@
+{
+  "name": "03 - Automated Guest Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "node_schedule_trigger",
+      "name": "Periodic Follow-up Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 240]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/escalations?status=pending&limit=10",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node_get_unresolved",
+      "name": "Fetch Unresolved Inquiries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter and generate warm follow-up messages\nconst items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const esc = item.json;\n  if (!esc || !esc.id) continue;\n\n  const guestName = esc.guest ? `${esc.guest.first_name} ${esc.guest.last_name}`.trim() : \"Guest\";\n  const followUpText = `Dear ${guestName}, this is a courtesy follow-up from the Grand Azure Front Desk regarding your inquiry: \"${esc.inquiry_text.substring(0, 80)}...\". Our team is currently reviewing your ticket (Ref #${esc.id}) to ensure everything is resolved to your complete satisfaction. Please let us know if you need anything else in the meantime.`;\n\n  output.push({\n    json: {\n      escalation_id: esc.id,\n      conversation_id: esc.conversation_id,\n      guest_id: esc.guest_id,\n      guest_name: guestName,\n      guest_email: esc.guest ? esc.guest.email : null,\n      follow_up_message: followUpText,\n      generated_at: new Date().toISOString()\n    }\n  });\n}\n\nreturn output.length > 0 ? output : [{ json: { message: \"No unresolved tickets requiring follow-up.\" } }];"
+      },
+      "id": "node_generate_followup",
+      "name": "Generate Follow-up Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"Automated Guest Follow-up\",\n  \"status\": \"success\",\n  \"trigger_event\": \"followup_queued\",\n  \"payload\": {\n    \"escalation_id\": {{ $json.escalation_id || 'null' }},\n    \"recipient\": \"{{ $json.guest_email }}\",\n    \"message_snippet\": \"{{ $json.follow_up_message }}\"\n  }\n}"
+      },
+      "id": "node_queue_log",
+      "name": "Queue Message & Log Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 240]
+    }
+  ],
+  "connections": {
+    "Periodic Follow-up Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unresolved Inquiries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Unresolved Inquiries": {
+      "main": [
+        [
+          {
+            "node": "Generate Follow-up Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Follow-up Message": {
+      "main": [
+        [
+          {
+            "node": "Queue Message & Log Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

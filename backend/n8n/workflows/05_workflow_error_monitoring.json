@@ -1,0 +1,90 @@
+{
+  "name": "05 - Workflow Error Monitoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node_error_trigger",
+      "name": "Global Workflow Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [180, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract structured failure details from error context\nconst errorData = $input.first().json;\n\nconst failedWorkflow = errorData.workflow ? errorData.workflow.name : \"Unknown Workflow\";\nconst executionId = errorData.execution ? errorData.execution.id : \"unknown_exec\";\nconst errorMessage = errorData.execution && errorData.execution.error ? errorData.execution.error.message : (errorData.message || \"Unspecified automation fault.\");\n\nreturn [{\n  json: {\n    workflow_name: failedWorkflow,\n    execution_id: executionId,\n    trigger_event: \"workflow_failure\",\n    status: \"failed\",\n    error_message: errorMessage,\n    timestamp: new Date().toISOString(),\n    retry_recommended: true,\n    retry_endpoint: `${$env.FASTAPI_BACKEND_URL || 'http://backend:8000'}/api/v1/webhooks/n8n-callback`\n  }\n}];"
+      },
+      "id": "node_parse_error",
+      "name": "Parse Error Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"{{ $json.workflow_name }}\",\n  \"execution_id\": \"{{ $json.execution_id }}\",\n  \"status\": \"failed\",\n  \"trigger_event\": \"workflow_failure_alert\",\n  \"error_message\": \"{{ $json.error_message }}\",\n  \"payload\": {\n    \"retry_recommended\": {{ $json.retry_recommended }},\n    \"failed_at\": \"{{ $json.timestamp }}\"\n  }\n}"
+      },
+      "id": "node_store_error_log",
+      "name": "Record Failure in MySQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [620, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"Error Alert Notification\",\n  \"status\": \"success\",\n  \"trigger_event\": \"admin_error_dispatched\",\n  \"payload\": {\n    \"recipient\": \"admin@grandhotelazure.demo\",\n    \"subject\": \"[CRITICAL] n8n Automation Failure in {{ $('Parse Error Context').item.json.workflow_name }}\",\n    \"error\": \"{{ $('Parse Error Context').item.json.error_message }}\",\n    \"execution_id\": \"{{ $('Parse Error Context').item.json.execution_id }}\"\n  }\n}"
+      },
+      "id": "node_alert_admin",
+      "name": "Notify Ops Administrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 240]
+    }
+  ],
+  "connections": {
+    "Global Workflow Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Error Context": {
+      "main": [
+        [
+          {
+            "node": "Record Failure in MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Failure in MySQL": {
+      "main": [
+        [
+          {
+            "node": "Notify Ops Administrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

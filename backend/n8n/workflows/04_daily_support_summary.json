@@ -1,0 +1,124 @@
+{
+  "name": "04 - Daily Support Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 23 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node_daily_cron",
+      "name": "Daily Midnight Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [180, 240]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/analytics/daily-summary",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node_fetch_daily_stats",
+      "name": "Retrieve Daily Support Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format executive summary and operational highlights\nconst data = $input.first().json;\n\nconst total = data.total_inquiries || 0;\nconst aiResolved = data.resolved_by_ai || 0;\nconst escalated = data.escalated_to_staff || 0;\nconst unresolved = data.unresolved_complaints_count || 0;\nconst categories = data.top_categories || [];\n\nconst catBreakdown = categories.map(c => `• ${c.category}: ${c.count}`).join(\"\\n\");\n\nconst executiveSummary = `=== GRAND AZURE RESORT: DAILY SUPPORT DIGEST ===\\nDate: ${data.report_date}\\nTotal Inquiries: ${total}\\nAI Automated Resolutions: ${aiResolved}\\nStaff Escalations: ${escalated}\\nPending Unresolved Complaints: ${unresolved}\\n\\nTop Categories:\\n${catBreakdown}\\n\\nAI Operations Analysis:\\n${data.ai_summary_text}`;\n\nreturn [{\n  json: {\n    report_date: data.report_date,\n    total_inquiries: total,\n    ai_resolved: aiResolved,\n    escalated: escalated,\n    unresolved: unresolved,\n    formatted_report: executiveSummary,\n    created_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node_format_report",
+      "name": "Format Daily Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"Daily Support Summary\",\n  \"status\": \"success\",\n  \"trigger_event\": \"daily_audit_completed\",\n  \"payload\": {\n    \"report_date\": \"{{ $json.report_date }}\",\n    \"total\": {{ $json.total_inquiries }},\n    \"ai_resolved\": {{ $json.ai_resolved }},\n    \"escalated\": {{ $json.escalated }},\n    \"unresolved\": {{ $json.unresolved }}\n  }\n}"
+      },
+      "id": "node_store_report",
+      "name": "Store Report in MySQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"Admin Daily Digest Notification\",\n  \"status\": \"success\",\n  \"trigger_event\": \"admin_notified\",\n  \"payload\": {\n    \"recipient\": \"admin@grandhotelazure.demo\",\n    \"subject\": \"Daily Hotel Support Digest - {{ $('Format Daily Digest').item.json.report_date }}\",\n    \"digest\": \"{{ $('Format Daily Digest').item.json.formatted_report }}\"\n  }\n}"
+      },
+      "id": "node_notify_admin",
+      "name": "Notify Hotel Administrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 240]
+    }
+  ],
+  "connections": {
+    "Daily Midnight Trigger": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Daily Support Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Daily Support Stats": {
+      "main": [
+        [
+          {
+            "node": "Format Daily Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Daily Digest": {
+      "main": [
+        [
+          {
+            "node": "Store Report in MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Report in MySQL": {
+      "main": [
+        [
+          {
+            "node": "Notify Hotel Administrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

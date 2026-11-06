@@ -1,0 +1,166 @@
+{
+  "name": "01 - Guest Inquiry Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "guest-inquiry",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node_webhook_trigger",
+      "name": "Guest Inquiry Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 240],
+      "webhookId": "guest-inquiry-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate incoming inquiry payload\nconst body = $input.first().json.body || $input.first().json;\n\nif (!body.inquiry_message || !body.email || !body.guest_name) {\n  throw new Error(\"Missing mandatory fields: guest_name, email, and inquiry_message are required.\");\n}\n\nreturn [{\n  json: {\n    guest_name: body.guest_name,\n    email: body.email,\n    inquiry_message: body.inquiry_message,\n    booking_reference: body.booking_reference || null,\n    inquiry_category: body.inquiry_category || null,\n    conversation_id: body.conversation_id || null,\n    channel: body.channel || \"n8n_webhook\",\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node_validate_input",
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/ai/process-inquiry",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node_call_fastapi",
+      "name": "Send Inquiry to FastAPI Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [620, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.requires_human }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node_check_escalation",
+      "name": "Check Human Escalation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [840, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BACKEND_URL || 'http://backend:8000' }}/api/v1/webhooks/n8n-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"Guest Inquiry Processing\",\n  \"status\": \"success\",\n  \"trigger_event\": \"escalation_detected\",\n  \"payload\": {\n    \"conversation_id\": \"{{ $json.conversation_id }}\",\n    \"intent\": \"{{ $json.intent }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"escalation_id\": {{ $json.escalation_id || 'null' }}\n  }\n}"
+      },
+      "id": "node_log_escalation",
+      "name": "Log Escalation Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"conversation_id\": \"{{ $json.conversation_id }}\",\n  \"intent\": \"{{ $json.intent }}\",\n  \"confidence\": {{ $json.confidence }},\n  \"priority\": \"{{ $json.priority }}\",\n  \"requires_human\": {{ $json.requires_human }},\n  \"response\": {{ JSON.stringify($json.response) }},\n  \"escalation_id\": {{ $json.escalation_id || 'null' }},\n  \"timestamp\": \"{{ $json.timestamp }}\"\n}",
+        "options": {}
+      },
+      "id": "node_respond_webhook",
+      "name": "Return Result to Guest",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 240]
+    }
+  ],
+  "connections": {
+    "Guest Inquiry Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Send Inquiry to FastAPI Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Inquiry to FastAPI Backend": {
+      "main": [
+        [
+          {
+            "node": "Check Human Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Human Escalation": {
+      "main": [
+        [
+          {
+            "node": "Log Escalation Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Result to Guest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Escalation Event": {
+      "main": [
+        [
+          {
+            "node": "Return Result to Guest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+
