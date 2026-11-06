@@ -68,53 +68,61 @@ class KnowledgeService:
         limit: int = 4
     ) -> List[HotelKnowledge]:
         """
-        Lightweight hybrid retrieval engine:
-        1. Breaks search into tokens.
-        2. Tries FULLTEXT search if MySQL is used, otherwise multi-token LIKE scoring.
-        3. Prioritizes category relevance if provided.
+        Intelligent hybrid retrieval engine:
+        1. Breaks search into tokens and cleans punctuation.
+        2. Searches all active hotel knowledge documents without artificial category barriers.
+        3. Scores matches across title, content, and keywords with category contextual boosts.
         """
-        tokens = [t.lower().strip() for t in query_text.replace("?", " ").replace("!", " ").replace(".", " ").split() if len(t.strip()) > 2]
+        clean_text = query_text.lower().replace("?", " ").replace("!", " ").replace(".", " ").replace(",", " ")
+        tokens = [t.strip() for t in clean_text.split() if len(t.strip()) > 2]
         
         # Stopwords filter
-        stopwords = {"the", "and", "for", "with", "can", "you", "tell", "have", "what", "how", "when", "there", "this", "that", "are", "could", "would", "about"}
+        stopwords = {"the", "and", "for", "with", "can", "you", "tell", "have", "what", "how", "when", "there", "this", "that", "are", "could", "would", "about", "does", "will"}
         tokens = [t for t in tokens if t not in stopwords]
 
-        query = db.query(HotelKnowledge).filter(HotelKnowledge.is_active == True)
-        if category and category != "other":
-            # If intent maps directly to category
-            query = query.filter(
-                or_(
-                    HotelKnowledge.category == category,
-                    HotelKnowledge.category == "general"
-                )
-            )
-
-        candidates = query.all()
+        candidates = db.query(HotelKnowledge).filter(HotelKnowledge.is_active == True).all()
 
         if not tokens:
+            if category and category != "other":
+                cat_matches = [e for e in candidates if e.category == category]
+                if cat_matches:
+                    return cat_matches[:limit]
             return candidates[:limit]
 
-        # Score candidates by keyword matches
+        # Score candidates by relevance
         scored_entries = []
         for entry in candidates:
             score = 0
-            searchable_text = f"{entry.title} {entry.content} {entry.keywords or ''}".lower()
+            title_lower = entry.title.lower()
+            content_lower = entry.content.lower()
+            keywords_lower = (entry.keywords or "").lower()
+            searchable_text = f"{title_lower} {content_lower} {keywords_lower}"
+
+            # Category boost
+            if category and category != "other" and entry.category == category:
+                score += 4
+
             for token in tokens:
-                if token in searchable_text:
-                    score += 1
-                if entry.keywords and token in entry.keywords.lower():
-                    score += 2
-                if token in entry.title.lower():
+                if token in title_lower:
+                    score += 5
+                elif token in keywords_lower:
                     score += 3
+                elif token in content_lower:
+                    score += 2
+
             if score > 0:
                 scored_entries.append((score, entry))
 
         scored_entries.sort(key=lambda x: x[0], reverse=True)
         results = [entry for _, entry in scored_entries[:limit]]
 
-        # If no scored matches found, fallback to category or top general rules
+        # Fallback if no keyword matches scored
         if not results:
-            results = db.query(HotelKnowledge).filter(HotelKnowledge.is_active == True).limit(limit).all()
+            if category and category != "other":
+                cat_matches = [e for e in candidates if e.category == category]
+                if cat_matches:
+                    return cat_matches[:limit]
+            results = candidates[:limit]
 
         return results
 

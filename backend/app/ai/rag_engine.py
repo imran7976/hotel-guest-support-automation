@@ -28,6 +28,18 @@ class RAGEngine:
         Maps inquiry intent to knowledge category where applicable.
         """
         mapped_cat = INTENT_TO_CATEGORY_MAP.get(category, category)
+        lower_q = query.lower()
+
+        # Context-aware category refinement
+        if any(w in lower_q for w in ["breakfast", "dining", "restaurant", "food", "buffet", "dinner", "room service"]):
+            mapped_cat = "dining"
+        elif any(w in lower_q for w in ["pet", "dog", "smoking", "smoke", "cigarette", "vape"]):
+            mapped_cat = "policies"
+        elif any(w in lower_q for w in ["wifi", "wi-fi", "internet", "password"]):
+            mapped_cat = "wifi"
+        elif any(w in lower_q for w in ["check in", "check-in", "check out", "check-out", "checkout", "luggage", "early arrival"]):
+            mapped_cat = "check_in_out"
+
         results = KnowledgeService.search_relevant(
             db=db,
             query_text=query,

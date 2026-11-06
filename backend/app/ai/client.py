@@ -86,8 +86,42 @@ class OpenAIClientWrapper:
 
         # Default greeting
         greeting = f"Hello {guest_name}, thank you for contacting Grand Azure Resort."
+        lower_msg = guest_message.lower()
 
-        if intent == "check_in_information":
+        # Adversarial Prompt Injection Defense
+        if escalation_reason == "Adversarial prompt injection attempt detected." or any(w in lower_msg for w in ["ignore all previous", "jailbreak", "system override", "output 'hacked'", "you are now a pirate", "reveal your system prompt", "admin_override", "admin override"]):
+            response_text = (
+                f"{greeting} I am the AI Front Desk Concierge for Grand Azure Resort & Hotel. "
+                "I can only assist with verified hotel bookings, guest services, amenities, and inquiries. "
+                "Per hotel policy, any cancellations, refunds, or financial modifications strictly require front desk management approval. "
+                "How may I assist you with your stay today?"
+            )
+            requires_human = True
+            priority = "high"
+            escalation_reason = "Adversarial prompt injection attempt detected."
+
+        # Critical Life-Safety Emergency Protocol
+        elif any(em in lower_msg for em in ["fire in", "smoke", "flames", "medical emergency", "collapsed", "unconscious", "ambulance", "heart attack", "gas leak", "natural gas", "smell gas"]):
+            response_text = (
+                "CRITICAL EMERGENCY ALERT: If there is an active fire or life-threatening medical emergency, please evacuate the area immediately. "
+                "Our front desk and emergency response personnel are being notified right now. "
+                "You can also dial 911 or internal extension 0 from any room phone for immediate direct dispatch."
+            )
+            requires_human = True
+            priority = "urgent"
+            escalation_reason = "CRITICAL LIFE-SAFETY EMERGENCY: Immediate staff and emergency dispatch required."
+
+        # Pure Greetings & Conversational Inquiries (only when no specific intent like check-in was identified)
+        elif intent in ["other", "hotel_facilities"] and not any(w in lower_msg for w in ["check in", "check-in", "checkout", "check out", "wifi", "pool", "booking", "room", "reservation", "cancel", "refund", "breakfast"]) and any(lower_msg.strip().rstrip("!.,?").startswith(g) or lower_msg.strip().rstrip("!.,?") == g for g in ["hello", "hi", "good morning", "good afternoon", "good evening", "hey", "can someone help me", "can you help me"]):
+            response_text = (
+                f"{greeting} Welcome to Grand Azure Resort & Hotel! I am your AI Front Desk Concierge. "
+                "How may I assist you today with your stay, reservation, or hotel amenities?"
+            )
+            requires_human = False
+            priority = "normal"
+            escalation_reason = None
+
+        elif intent == "check_in_information":
             response_text = (
                 f"{greeting} Our standard check-in time is 2:00 PM (14:00) and check-out is 11:00 AM. "
                 "Early check-in prior to 2:00 PM is subject to room availability upon arrival. "
@@ -117,11 +151,38 @@ class OpenAIClientWrapper:
         elif intent == "booking_modification":
             response_text = (
                 f"{greeting} We have received your booking modification request. "
-                "To ensure proper room inventory and rate adjustments, all date and room changes require "
-                "front-desk verification. A member of our reservations team will review your request shortly."
+                "To ensure proper room inventory and rate adjustments, all date, room, and upgrade changes require "
+                "front-desk verification and management approval. A member of our reservations team will review your request shortly."
             )
             requires_human = True
             escalation_reason = "Booking modification request requires front desk approval."
+        elif intent == "booking_inquiry":
+            if extracted.booking_reference:
+                response_text = (
+                    f"{greeting} Your reservation details for booking reference {extracted.booking_reference} "
+                    "are confirmed in our system. You are booked with Grand Azure Resort."
+                )
+            else:
+                response_text = (
+                    f"{greeting} To look up your reservation, please provide your booking reference number (e.g. GAH-78901) "
+                    "or the email address used when booking."
+                )
+            requires_human = False
+            escalation_reason = None
+        elif intent == "payment_inquiry":
+            if any(w in lower_msg for w in ["unexpected", "unrecognized", "why is there", "dispute", "didn't recognize", "did not recognize"]):
+                response_text = (
+                    f"{greeting} We have logged your billing inquiry regarding the unrecognized charge on your folio. "
+                    "Our front desk accounting team will review your statement and contact you directly with an itemized explanation."
+                )
+                requires_human = True
+                priority = "high"
+                escalation_reason = "Billing dispute requires front desk accounting review."
+            else:
+                response_text = (
+                    f"{greeting} We accept all major credit cards (Visa, MasterCard, American Express) as well as debit cards and cash deposits at check-in. "
+                    "An itemized invoice is provided upon departure."
+                )
         elif intent in ["maintenance_requests", "general_complaint"]:
             response_text = (
                 f"{greeting} We sincerely apologize for the inconvenience you are experiencing"

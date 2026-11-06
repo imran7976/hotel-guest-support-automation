@@ -366,3 +366,4 @@ def test_workflow_05_workflow_error_monitoring_execution(client, db_session):
     assert log is not None
     assert log.status == "failed"
     assert "OpenAI API timeout" in log.error_message
+
