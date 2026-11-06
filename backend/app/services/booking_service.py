@@ -1,11 +1,17 @@
+import secrets
+import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.models.booking import Booking
 from app.models.room import Room
 from app.models.guest import Guest
 from app.models.escalation import Escalation
-from app.schemas.booking import ModificationRequest, CancellationRequest
+from app.schemas.booking import ModificationRequest, CancellationRequest, BookingCreateRequest
+from app.services.guest_service import GuestService
+from app.services.conversation_service import ConversationService
+
 
 
 class BookingService:
@@ -74,6 +80,73 @@ class BookingService:
         return available_rooms
 
     @staticmethod
+    def create_booking(db: Session, booking_data: BookingCreateRequest) -> Booking:
+        """Creates a new confirmed demo booking with guest auto-resolution and room assignment."""
+        if booking_data.check_out_date <= booking_data.check_in_date:
+            raise ValueError("Check-out date must be strictly after check-in date.")
+
+        # 1. Resolve or create guest
+        guest = GuestService.get_or_create(
+            db=db,
+            guest_name=booking_data.guest_name,
+            email=booking_data.guest_email
+        )
+
+        # 2. Find eligible available room
+        query = db.query(Room).filter(Room.status != "maintenance")
+        if booking_data.room_number:
+            query = query.filter(Room.room_number == booking_data.room_number.strip())
+        elif booking_data.room_type:
+            query = query.filter(Room.room_type.ilike(f"%{booking_data.room_type.strip()}%"))
+
+        candidate_rooms = query.all()
+        selected_room = None
+        for room in candidate_rooms:
+            overlap = (
+                db.query(Booking)
+                .filter(
+                    Booking.room_id == room.id,
+                    Booking.status.in_(["confirmed", "pending_modification"]),
+                    Booking.check_in_date < booking_data.check_out_date,
+                    Booking.check_out_date > booking_data.check_in_date
+                )
+                .first()
+            )
+            if not overlap:
+                selected_room = room
+                break
+
+        if not selected_room:
+            raise ValueError("No available room found matching criteria for the requested dates.")
+
+        # 3. Compute cost
+        nights = max(1, (booking_data.check_out_date - booking_data.check_in_date).days)
+        total_amount = Decimal(str(nights)) * Decimal(str(selected_room.price_per_night))
+
+        # 4. Generate reference
+        for _ in range(10):
+            ref = f"GAH-{secrets.token_hex(3).upper()}"
+            if not db.query(Booking).filter(Booking.booking_reference == ref).first():
+                break
+        else:
+            ref = f"GAH-{uuid.uuid4().hex[:6].upper()}"
+
+        booking = Booking(
+            booking_reference=ref,
+            guest_id=guest.id,
+            room_id=selected_room.id,
+            check_in_date=booking_data.check_in_date,
+            check_out_date=booking_data.check_out_date,
+            total_amount=total_amount,
+            status="confirmed",
+            special_requests=booking_data.special_requests
+        )
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+        return booking
+
+    @staticmethod
     def request_modification(
         db: Session,
         booking_id: int,
@@ -95,8 +168,17 @@ class BookingService:
             f"Reason: {modification.reason}"
         )
 
+        # Ensure conversation exists to satisfy foreign key integrity
+        conv = ConversationService.get_or_create_conversation(
+            db=db,
+            guest_id=booking.guest_id,
+            conversation_id=conversation_id,
+            booking_id=booking.id,
+            channel="web_chat"
+        )
+
         escalation = Escalation(
-            conversation_id=conversation_id or f"conv_mod_{booking.booking_reference}",
+            conversation_id=conv.id,
             guest_id=booking.guest_id,
             booking_id=booking.id,
             inquiry_text=inquiry_text,
@@ -137,8 +219,17 @@ class BookingService:
             f"Refund Requested: {cancellation.request_refund}."
         )
 
+        # Ensure conversation exists to satisfy foreign key integrity
+        conv = ConversationService.get_or_create_conversation(
+            db=db,
+            guest_id=booking.guest_id,
+            conversation_id=conversation_id,
+            booking_id=booking.id,
+            channel="web_chat"
+        )
+
         escalation = Escalation(
-            conversation_id=conversation_id or f"conv_canc_{booking.booking_reference}",
+            conversation_id=conv.id,
             guest_id=booking.guest_id,
             booking_id=booking.id,
             inquiry_text=inquiry_text,

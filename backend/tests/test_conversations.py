@@ -45,3 +45,17 @@ def test_conversation_api(client):
     assert res.status_code == 200
     assert isinstance(res.json(), list)
 
+    # POST create conversation
+    create_payload = {
+        "guest_name": "Tony Stark",
+        "guest_email": "tony@stark.com",
+        "booking_reference": "GAH-78901",
+        "channel": "web_chat"
+    }
+    create_res = client.post("/api/v1/conversations", json=create_payload)
+    assert create_res.status_code == 201
+    conv_data = create_res.json()
+    assert conv_data["id"].startswith("conv_")
+    assert conv_data["booking_id"] is not None
+
+

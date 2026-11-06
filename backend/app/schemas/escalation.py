@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.schemas.guest import GuestResponse
 
 
@@ -26,6 +26,8 @@ class EscalationUpdate(BaseModel):
 
 
 class EscalationResponse(EscalationBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     status: str
     staff_response: Optional[str] = None
@@ -34,7 +36,3 @@ class EscalationResponse(EscalationBase):
     updated_at: datetime
     resolved_at: Optional[datetime] = None
     guest: Optional[GuestResponse] = None
-
-    class Config:
-        from_attributes = True
-

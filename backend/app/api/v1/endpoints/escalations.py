@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.schemas.escalation import EscalationResponse, EscalationUpdate, EscalationCreate
 from app.services.escalation_service import EscalationService
-from app.api.v1.endpoints.auth import get_current_admin
+from app.api.v1.endpoints.auth import get_current_admin, get_optional_admin
 from app.models.admin_user import AdminUser
 
 router = APIRouter()
@@ -44,7 +44,7 @@ def update_escalation(
     escalation_id: int,
     update_in: EscalationUpdate,
     db: Session = Depends(get_db),
-    current_admin: Optional[AdminUser] = Depends(get_current_admin)
+    current_admin: Optional[AdminUser] = Depends(get_optional_admin)
 ):
     staff_id = current_admin.id if current_admin else None
     escalation = EscalationService.update_escalation(

@@ -6,6 +6,7 @@ from app.database.session import get_db
 from app.schemas.booking import (
     BookingResponse,
     BookingCreate,
+    BookingCreateRequest,
     ModificationRequest,
     CancellationRequest
 )
@@ -23,6 +24,18 @@ def get_bookings(
     db: Session = Depends(get_db)
 ):
     return BookingService.list_bookings(db, status=status, skip=skip, limit=limit)
+
+
+@router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
+def create_booking(
+    booking_in: BookingCreateRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        return BookingService.create_booking(db, booking_in)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 
 @router.get("/availability")

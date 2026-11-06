@@ -61,3 +61,23 @@ def test_booking_api_routes(client):
     res_404 = client.get("/api/v1/bookings/INVALID-999")
     assert res_404.status_code == 404
 
+
+def test_create_booking_api(client):
+    today = datetime.date.today()
+    payload = {
+        "guest_name": "Oliver Queen",
+        "guest_email": "oliver@queen.com",
+        "check_in_date": (today + datetime.timedelta(days=40)).isoformat(),
+        "check_out_date": (today + datetime.timedelta(days=45)).isoformat(),
+        "room_type": "Deluxe",
+        "number_of_guests": 2,
+        "special_requests": "Quiet room high floor please"
+    }
+    res = client.post("/api/v1/bookings", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["booking_reference"].startswith("GAH-")
+    assert data["status"] == "confirmed"
+    assert data["total_amount"] is not None
+
+

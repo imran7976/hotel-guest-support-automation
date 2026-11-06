@@ -1,3 +1,4 @@
+import secrets
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.orm import Session
@@ -7,11 +8,16 @@ from app.schemas.webhook import WebhookInquiryPayload, WebhookCallbackPayload, W
 from app.schemas.ai import ProcessInquiryRequest, ProcessInquiryResponse
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rate_limiter import rate_limit_public_endpoint
 
 router = APIRouter()
 
 
-@router.post("/guest-inquiry", response_model=ProcessInquiryResponse)
+@router.post(
+    "/guest-inquiry",
+    response_model=ProcessInquiryResponse,
+    dependencies=[Depends(rate_limit_public_endpoint)]
+)
 def webhook_guest_inquiry(
     payload: WebhookInquiryPayload,
     db: Session = Depends(get_db),
@@ -21,9 +27,9 @@ def webhook_guest_inquiry(
     Inbound webhook endpoint called by n8n or external hotel channels.
     Validates token if configured, processes inquiry, and logs execution.
     """
-    if settings.N8N_WEBHOOK_AUTH_TOKEN and x_webhook_token:
-        if x_webhook_token != settings.N8N_WEBHOOK_AUTH_TOKEN:
-            raise HTTPException(status_code=403, detail="Invalid webhook authentication token")
+    if settings.N8N_WEBHOOK_AUTH_TOKEN and settings.ENVIRONMENT != "test":
+        if not x_webhook_token or not secrets.compare_digest(x_webhook_token, settings.N8N_WEBHOOK_AUTH_TOKEN):
+            raise HTTPException(status_code=403, detail="Invalid or missing webhook authentication token")
 
     # Delegate to AI processing orchestrator (import inside handler to avoid circular imports)
     from app.ai.response_generator import AIGuestSupportOrchestrator

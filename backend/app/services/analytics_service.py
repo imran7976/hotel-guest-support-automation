@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -139,5 +139,5 @@ class AnalyticsService:
             top_categories=top_categories_list,
             unresolved_complaints_count=unresolved,
             ai_summary_text=summary_text,
-            generated_at=datetime.utcnow().isoformat()
+            generated_at=datetime.now(timezone.utc).isoformat()
         )

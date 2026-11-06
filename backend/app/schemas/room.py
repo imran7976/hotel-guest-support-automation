@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class RoomBase(BaseModel):
@@ -20,10 +20,8 @@ class RoomCreate(RoomBase):
 
 
 class RoomResponse(RoomBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
-

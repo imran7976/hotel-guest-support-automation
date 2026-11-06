@@ -1,5 +1,4 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +17,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "change-this-ultra-secure-secret-key-in-production-hotel-guest-2025"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    RATE_LIMIT_ENABLED: bool = True
 
     # Server & CORS
     BACKEND_HOST: str = "0.0.0.0"

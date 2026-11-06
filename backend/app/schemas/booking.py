@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.schemas.room import RoomResponse
 from app.schemas.guest import GuestResponse
 
@@ -19,6 +19,13 @@ class BookingCreate(BookingBase):
     total_amount: Decimal
 
 
+class BookingCreateRequest(BookingBase):
+    guest_email: str
+    guest_name: str
+    room_type: Optional[str] = None
+    room_number: Optional[str] = None
+
+
 class ModificationRequest(BaseModel):
     new_check_in_date: Optional[date] = None
     new_check_out_date: Optional[date] = None
@@ -32,6 +39,8 @@ class CancellationRequest(BaseModel):
 
 
 class BookingResponse(BookingBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     booking_reference: str
     guest_id: int
@@ -42,7 +51,3 @@ class BookingResponse(BookingBase):
     updated_at: datetime
     room: Optional[RoomResponse] = None
     guest: Optional[GuestResponse] = None
-
-    class Config:
-        from_attributes = True
-

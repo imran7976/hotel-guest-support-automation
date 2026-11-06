@@ -44,7 +44,7 @@ class KnowledgeService:
         entry = db.query(HotelKnowledge).filter(HotelKnowledge.id == knowledge_id).first()
         if not entry:
             return None
-        data = knowledge_in.dict(exclude_unset=True)
+        data = knowledge_in.model_dump(exclude_unset=True)
         for field, value in data.items():
             setattr(entry, field, value)
         db.commit()

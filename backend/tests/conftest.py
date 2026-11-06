@@ -11,8 +11,10 @@ from app.database.seed_data import init_db
 from app.core.config import settings
 from app.main import app
 
-# Disable n8n webhook sync during automated unit tests
+# Configure settings for automated unit tests
 settings.N8N_ENABLED = False
+settings.ENVIRONMENT = "test"
+settings.RATE_LIMIT_ENABLED = False
 
 # In-memory SQLite database for test isolation
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

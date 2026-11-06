@@ -1,11 +1,12 @@
 import pytest
 from app.models.workflow_log import WorkflowLog
+from app.core.config import settings
 
 
 def test_webhook_inbound_inquiry(client):
     payload = {
         "guest_name": "Sarah Connor",
-        "email": "sarah@resistance.test",
+        "email": "sarah@resistance.com",
         "inquiry_message": "What time is breakfast served on Sunday?",
         "booking_reference": "GAH-78901",
         "channel": "webhook"
@@ -15,6 +16,39 @@ def test_webhook_inbound_inquiry(client):
     data = res.json()
     assert data["intent"] in ["hotel_facilities", "dining", "check_in_information"]
     assert len(data["response"]) > 0
+
+
+def test_webhook_auth_enforcement(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_AUTH_TOKEN", "super_secret_token_123")
+
+    payload = {
+        "guest_name": "Sarah Connor",
+        "email": "sarah@resistance.com",
+        "inquiry_message": "What time is breakfast served on Sunday?",
+        "channel": "webhook"
+    }
+
+    # Missing token should return 403
+    res_no_token = client.post("/api/v1/webhooks/guest-inquiry", json=payload)
+    assert res_no_token.status_code == 403
+
+    # Invalid token should return 403
+    res_bad_token = client.post(
+        "/api/v1/webhooks/guest-inquiry",
+        json=payload,
+        headers={"x-webhook-token": "wrong_token"}
+    )
+    assert res_bad_token.status_code == 403
+
+    # Valid token should succeed
+    res_valid = client.post(
+        "/api/v1/webhooks/guest-inquiry",
+        json=payload,
+        headers={"x-webhook-token": "super_secret_token_123"}
+    )
+    assert res_valid.status_code == 200
+
 
 
 def test_n8n_callback_and_logs(client, db_session):

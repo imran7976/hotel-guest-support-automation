@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.workflow_log import WorkflowLog
@@ -86,7 +86,7 @@ class AIGuestSupportOrchestrator:
             priority=validated_response.priority,
             requires_human=validated_response.requires_human,
             metadata_json={
-                "extracted": validated_response.extracted_information.dict(),
+                "extracted": validated_response.extracted_information.model_dump(),
                 "channel": request.channel
             }
         )
@@ -156,6 +156,6 @@ class AIGuestSupportOrchestrator:
             response=validated_response.response,
             escalation_id=escalation_id,
             retrieved_knowledge=[k.title for k in knowledge_entries],
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         )
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.models.escalation import Escalation
@@ -94,7 +94,7 @@ class EscalationService:
         if update_in.status:
             escalation.status = update_in.status
             if update_in.status == "resolved":
-                escalation.resolved_at = datetime.utcnow()
+                escalation.resolved_at = datetime.now(timezone.utc)
                 # Also resolve the parent conversation if no other pending escalations
                 conv = db.query(Conversation).filter(Conversation.id == escalation.conversation_id).first()
                 if conv:

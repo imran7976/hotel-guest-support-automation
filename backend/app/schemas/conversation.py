@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class MessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     conversation_id: str
     sender_type: str
@@ -15,14 +17,18 @@ class MessageResponse(BaseModel):
     metadata_json: Optional[Dict[str, Any]] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class MessageCreate(BaseModel):
     content: str
     sender_type: str = "guest"  # guest, staff
     channel: Optional[str] = "web_chat"
+
+
+class ConversationCreate(BaseModel):
+    guest_email: EmailStr
+    guest_name: str
+    booking_reference: Optional[str] = None
+    channel: str = "web_chat"
 
 
 class InquirySubmission(BaseModel):
@@ -36,6 +42,8 @@ class InquirySubmission(BaseModel):
 
 
 class ConversationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     guest_id: int
     booking_id: Optional[int] = None
@@ -46,11 +54,10 @@ class ConversationResponse(BaseModel):
     updated_at: datetime
     messages: List[MessageResponse] = []
 
-    class Config:
-        from_attributes = True
-
 
 class ConversationSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     guest_name: str
     guest_email: str
@@ -60,4 +67,3 @@ class ConversationSummary(BaseModel):
     last_message: Optional[str] = None
     last_message_at: Optional[datetime] = None
     message_count: int = 0
-

@@ -46,7 +46,7 @@ class GuestService:
         guest = db.query(Guest).filter(Guest.id == guest_id).first()
         if not guest:
             return None
-        update_data = guest_in.dict(exclude_unset=True)
+        update_data = guest_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(guest, field, value)
         db.commit()

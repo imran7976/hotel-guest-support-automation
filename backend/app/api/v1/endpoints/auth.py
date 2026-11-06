@@ -17,10 +17,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token
 def get_current_admin(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-) -> Optional[AdminUser]:
+) -> AdminUser:
     if not token:
-        # In development/demo, permit requests if no token is sent or return default admin
-        return db.query(AdminUser).first()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -33,6 +36,24 @@ def get_current_admin(
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found")
     return user
+
+
+def get_optional_admin(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[AdminUser]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email:
+            user = db.query(AdminUser).filter(AdminUser.email == email).first()
+            if user and user.is_active:
+                return user
+    except Exception:
+        pass
+    return None
 
 
 @router.post("/login", response_model=Token)

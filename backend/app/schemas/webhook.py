@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class WebhookInquiryPayload(BaseModel):
@@ -22,6 +22,8 @@ class WebhookCallbackPayload(BaseModel):
 
 
 class WorkflowLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     workflow_name: str
     execution_id: Optional[str] = None
@@ -30,7 +32,3 @@ class WorkflowLogResponse(BaseModel):
     error_message: Optional[str] = None
     payload_json: Optional[Dict[str, Any]] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-

@@ -5,11 +5,13 @@ from app.database.session import get_db
 from app.schemas.conversation import (
     ConversationResponse,
     ConversationSummary,
+    ConversationCreate,
     MessageResponse,
     MessageCreate
 )
 from app.services.conversation_service import ConversationService
 from app.services.guest_service import GuestService
+from app.services.booking_service import BookingService
 
 router = APIRouter()
 
@@ -22,6 +24,27 @@ def list_conversations(
     db: Session = Depends(get_db)
 ):
     return ConversationService.list_conversations(db, status=status, skip=skip, limit=limit)
+
+
+@router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
+def create_conversation(
+    conv_in: ConversationCreate,
+    db: Session = Depends(get_db)
+):
+    guest = GuestService.get_or_create(db, guest_name=conv_in.guest_name, email=conv_in.guest_email)
+    booking_id = None
+    if conv_in.booking_reference:
+        booking = BookingService.get_by_reference(db, conv_in.booking_reference)
+        if booking:
+            booking_id = booking.id
+
+    return ConversationService.get_or_create_conversation(
+        db=db,
+        guest_id=guest.id,
+        booking_id=booking_id,
+        channel=conv_in.channel
+    )
+
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)

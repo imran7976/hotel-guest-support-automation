@@ -34,7 +34,7 @@ class OpenAIClientWrapper:
         user_prompt = (
             f"GUEST NAME: {guest_name}\n"
             f"IDENTIFIED INTENT: {intent_data.intent}\n"
-            f"EXTRACTED ENTITIES: {intent_data.extracted_information.dict()}\n\n"
+            f"EXTRACTED ENTITIES: {intent_data.extracted_information.model_dump()}\n\n"
             f"VERIFIED HOTEL KNOWLEDGE CONTEXT:\n{grounded_context}\n\n"
             f"GUEST INQUIRY:\n{guest_message}"
         )

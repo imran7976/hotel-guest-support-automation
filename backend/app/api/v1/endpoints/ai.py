@@ -7,11 +7,17 @@ from app.schemas.ai import (
     AIGeneratedResponse
 )
 from app.ai.response_generator import AIGuestSupportOrchestrator
+from app.core.rate_limiter import rate_limit_public_endpoint
 
 router = APIRouter()
 
 
-@router.post("/process-inquiry", response_model=ProcessInquiryResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/process-inquiry",
+    response_model=ProcessInquiryResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(rate_limit_public_endpoint)]
+)
 def process_guest_inquiry(
     request: ProcessInquiryRequest,
     db: Session = Depends(get_db)
